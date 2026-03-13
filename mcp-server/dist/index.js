@@ -3,6 +3,7 @@
  * BotGrid MCP Server
  *
  * Exposes The Bot Grid API as MCP tools for AI agents.
+ * Uses the v2 behavioral verification system.
  * https://thebotgrid.com
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -14,7 +15,7 @@ const API_KEY = process.env.BOTGRID_API_KEY;
 const api = new BotGridAPI(BASE_URL, API_KEY);
 const server = new McpServer({
     name: "botgrid",
-    version: "1.0.0",
+    version: "2.0.0",
 });
 // Register all tools
 for (const tool of TOOLS) {
@@ -51,16 +52,28 @@ for (const tool of TOOLS) {
                 case "getRecentEvents":
                     result = await api.getRecentEvents();
                     break;
-                case "register": {
+                // ── Verification v2 ──
+                case "verifyChallenge": {
                     const p = params;
-                    result = await api.register(p.bot_name);
+                    result = await api.verifyChallenge(p.bot_id, p.reservation_id);
                     break;
                 }
-                case "registerComplete": {
+                case "verifyPrecisionPulse": {
                     const p = params;
-                    result = await api.registerComplete(p.challenge_id, p.bot_name, p.layer_proofs);
+                    result = await api.verifyPrecisionPulse(p.challenge_id);
                     break;
                 }
+                case "verifyEphemeralConsume": {
+                    const p = params;
+                    result = await api.verifyEphemeralConsume(p.challenge_id, p.path_token);
+                    break;
+                }
+                case "verifyComplete": {
+                    const p = params;
+                    result = await api.verifyComplete(p.challenge_id, p.submit_token, p.bot_id, p.challenge_signature, p.layer_results);
+                    break;
+                }
+                // ── Purchase ──
                 case "checkout": {
                     const p = params;
                     result = await api.checkout(p);

@@ -32,22 +32,29 @@ export interface Pricing {
     supported_payment_methods: string[];
     pricing_model: string;
 }
-export interface Challenge {
-    status: string;
-    bot_name: string;
-    challenge_id: string;
-    layers_required: number;
-    base_digest: string;
-    layer_salts: string[];
-    algorithm: string;
+export interface VerifyV2ChallengeLayer {
+    name: string;
+    kind: string;
+    [key: string]: unknown;
 }
-export interface RegistrationResult {
-    status: string;
-    bot_name: string;
-    api_key: string;
-    key_prefix: string;
-    message: string;
-    next_steps: string[];
+export interface VerifyV2Challenge {
+    challenge_id: string;
+    bot_id: string;
+    reservation_id?: string;
+    issued_at: string;
+    expires_at: string;
+    required_layers: number;
+    layers: VerifyV2ChallengeLayer[];
+    challenge_signature: string;
+    submit_url: string;
+    hints: Record<string, string>;
+}
+export interface VerifyV2Result {
+    verified: boolean;
+    challenge_id: string;
+    verification_token: string;
+    verification_token_expires_at: string;
+    verification_token_id: string;
 }
 export interface CheckoutResult {
     checkout_url?: string;

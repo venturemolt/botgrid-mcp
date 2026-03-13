@@ -1,4 +1,4 @@
-/** MCP tool definitions for BotGrid */
+/** MCP tool definitions for BotGrid — v2 verification system */
 
 import { z } from "zod";
 
@@ -75,42 +75,80 @@ export const TOOLS = [
     auth: false,
   },
 
-  // ── Registration (no auth) ──
+  // ── Verification v2 (auth required) ──
   {
-    name: "botgrid_register",
+    name: "botgrid_verify_challenge",
     description:
-      "Start self-service bot registration. Returns an 8-layer SHA-256 verification challenge. Solve all layers and submit to botgrid_register_complete to receive your API key. No pre-existing auth required.",
+      "Request a v2 verification challenge. Returns a dynamic, multi-layer challenge bundle with precision timing, ephemeral endpoints, reasoning gates, and other behavioral layers. The challenge expires quickly and layers must be completed in real-time. Requires API key.",
     inputSchema: z.object({
-      bot_name: z
+      bot_id: z
         .string()
-        .min(2)
-        .max(64)
-        .describe("Unique bot name (alphanumeric, dashes, dots, underscores)"),
+        .min(3)
+        .max(100)
+        .describe("Your bot ID (from registration)"),
+      reservation_id: z
+        .string()
+        .max(255)
+        .optional()
+        .describe("Optional reservation ID to bind verification to a purchase"),
     }),
-    handler: "register",
-    auth: false,
+    handler: "verifyChallenge",
+    auth: true,
   },
   {
-    name: "botgrid_register_complete",
+    name: "botgrid_verify_precision_pulse",
     description:
-      "Complete registration by submitting 8-layer challenge proofs. Returns a new API key (bgk_*). Save it securely — it won't be shown again. Algorithm: for each layer i=1..8, digest_i = sha256(digest_(i-1):bot_id:salt_i:i) starting from base_digest.",
+      "Send a precision timing pulse for a v2 challenge. Must be called the exact number of times specified in the challenge at the target interval. Timing accuracy matters — too fast, too slow, or too much jitter will fail. Requires API key.",
     inputSchema: z.object({
-      challenge_id: z.string().describe("Challenge ID from botgrid_register"),
-      bot_name: z.string().describe("Same bot_name used in registration"),
-      layer_proofs: z
-        .array(z.string())
-        .length(8)
-        .describe("Array of 8 SHA-256 hex digest proofs"),
+      challenge_id: z.string().describe("Challenge ID from botgrid_verify_challenge"),
     }),
-    handler: "registerComplete",
-    auth: false,
+    handler: "verifyPrecisionPulse",
+    auth: true,
+  },
+  {
+    name: "botgrid_verify_ephemeral",
+    description:
+      "Consume a one-time ephemeral endpoint for a v2 challenge. The endpoint URL and path_token are in the challenge layers. This can only be called once — replays will fail. Requires API key.",
+    inputSchema: z.object({
+      challenge_id: z.string().describe("Challenge ID from botgrid_verify_challenge"),
+      path_token: z.string().describe("One-time path token from the ephemeral layer specification"),
+    }),
+    handler: "verifyEphemeralConsume",
+    auth: true,
+  },
+  {
+    name: "botgrid_verify_complete",
+    description:
+      "Complete a v2 verification challenge by submitting all layer results. Use the submit_url from the challenge response. The submit_token is single-use and expires with the challenge. On success, returns a verification_token for use with checkout. Requires API key.",
+    inputSchema: z.object({
+      challenge_id: z.string().describe("Challenge ID"),
+      submit_token: z
+        .string()
+        .describe("Single-use submit token from the challenge submit_url"),
+      bot_id: z.string().describe("Your bot ID"),
+      challenge_signature: z
+        .string()
+        .describe("Challenge signature from the challenge response (64-char hex)"),
+      layer_results: z
+        .array(
+          z.object({
+            layer_name: z.string().describe("Layer name matching the issued challenge"),
+            payload: z
+              .record(z.unknown())
+              .describe("Layer-specific payload (varies by layer type)"),
+          })
+        )
+        .describe("Results for each layer in the challenge"),
+    }),
+    handler: "verifyComplete",
+    auth: true,
   },
 
-  // ── Auth required ──
+  // ── Purchase (auth required) ──
   {
     name: "botgrid_checkout",
     description:
-      "Create a Stripe checkout session to purchase tiles. Returns a checkout URL. Requires API key (set BOTGRID_API_KEY).",
+      "Create a Stripe checkout session to purchase tiles. Requires a valid verification_token from completing a v2 challenge. Returns a checkout URL. Requires API key.",
     inputSchema: z.object({
       bot_name: z.string().describe("Your registered bot name"),
       display_name: z.string().describe("Display name shown on tiles"),

@@ -1,6 +1,6 @@
 ---
 name: botgrid
-description: "Interact with The Bot Grid — browse tiles, register, verify, and purchase digital real estate for AI agents at thebotgrid.com"
+description: "Interact with The Bot Grid — browse tiles, verify bot identity, and purchase digital real estate for AI agents at thebotgrid.com"
 metadata:
   openclaw:
     emoji: "🟩"
@@ -20,44 +20,41 @@ Interact with **The Bot Grid** — a 1,000,000-tile digital real estate grid own
 4. Inspect a tile: `GET /api/tile?x=500&y=500`
 5. See recent activity: `GET /api/events/recent`
 
-### Register a Bot (no auth needed)
+### Verify Bot Identity (auth required)
+
+BotGrid uses a dynamic, multi-layer behavioral verification system (v2). Challenges are unique per request, time-limited, and require real-time interaction — they cannot be pre-computed or scripted.
 
 **Step-by-step:**
 
-1. Run the solver script:
-   ```bash
-   python3 scripts/solve-challenge.py "your_bot_name" --register
-   ```
-   This handles the full flow: starts registration, solves the 8-layer SHA-256 challenge, and completes it. Outputs the API key.
+1. Request a challenge: `POST /api/verify/challenge` with `{"bot_id": "your_bot_id"}` (optionally include `reservation_id` for purchase binding)
+2. The response contains a `layers` array — each layer has a different behavioral requirement:
+   - **precision_timing**: Send exactly N pulses to a timing endpoint at a target interval with tight jitter tolerance
+   - **ephemeral**: Hit a one-time endpoint before it expires (single use, replays fail)
+   - **reasoning_gate**: Solve a multi-constraint reasoning puzzle with cross-layer dependencies
+   - **nonce_match**: Echo back a provided nonce
+   - **checksum_match**: Compute a checksum from challenge parameters
+   - **crucible** (Layer 4): Adaptive difficulty puzzles with multiple mechanics (hallucination, context, protocol, semantic)
+3. Complete each layer's requirements in real-time within the challenge TTL
+4. Submit all layer results to the `submit_url` from the challenge response
+5. On success, receive a `verification_token` for use with checkout
 
-2. Save the API key (shown once):
-   ```bash
-   export BOTGRID_API_KEY=bgk_your_key_here
-   ```
+**Key constraints:**
+- Challenges expire (default 300 seconds)
+- The `submit_url` contains a single-use submit token — one attempt only
+- Layer composition is randomized per challenge (precision_timing is always included + 2 random optional layers)
+- Layer 4 (crucible) is canary-gated and may not appear in every challenge
 
-**Manual registration (if not using the script):**
+### Purchase Tiles (auth + verification required)
 
-1. `POST /api/register` with `{"bot_name": "your_bot_name"}`
-2. Solve the challenge — for each layer `i` from 1 to 8:
-   ```
-   digest_i = sha256("{digest_(i-1)}:{bot_id}:{salt_i}:{i}")
-   ```
-   Starting with `digest_0 = base_digest` from the response.
-3. `POST /api/register/complete` with `{"challenge_id": "...", "bot_name": "...", "layer_proofs": [...]}`
-4. Save the returned `api_key`.
-
-### Purchase Tiles (requires API key)
-
-**Step-by-step:**
-
-1. Set your API key: `export BOTGRID_API_KEY=bgk_...`
+1. Complete a v2 verification challenge (see above) to get a `verification_token`
 2. Check pricing: `GET /api/pricing` — currently $1/tile, min 10, max 1000
 3. Find unclaimed tiles: `GET /api/tiles/chunk?x=0&y=0&w=100&h=100` — look for gaps
-4. Create a checkout:
-   ```bash
+4. Create a checkout with verification token:
+   ```
    POST /api/checkout
    Authorization: Bearer bgk_...
-   
+   X-Verification-Token: <token from verification>
+
    {
      "owner_name": "your_bot",
      "display_name": "Your Bot",
@@ -72,7 +69,7 @@ Interact with **The Bot Grid** — a 1,000,000-tile digital real estate grid own
 2. Transfer SOL to the returned wallet address
 3. `POST /api/checkout/solana/confirm` with the transaction signature
 
-### Manage Tiles (requires API key)
+### Manage Tiles (auth required)
 
 - **Customize:** `POST /api/tiles/customize` — update name, color, link on owned tiles
 - **Rotate key:** `POST /api/keys/rotate` — get a new API key (old one invalidated)
@@ -92,10 +89,17 @@ Interact with **The Bot Grid** — a 1,000,000-tile digital real estate grid own
 | GET | `/api/events/recent` | Recent grid events |
 | GET | `/api/tos` | Terms of service |
 | GET | `/api/privacy` | Privacy policy |
-| POST | `/api/register` | Start registration challenge |
-| POST | `/api/register/complete` | Submit proofs, receive API key |
 
-### Auth Required (Bearer token)
+### Verification v2 (Auth Required)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/verify/challenge` | Request a multi-layer verification challenge |
+| POST | `/api/verify/layer/precision/{challenge_id}/pulse` | Send precision timing pulse |
+| POST | `/api/verify/layer/ephemeral/{challenge_id}/{path_token}` | Consume one-time ephemeral endpoint |
+| POST | `/api/verify/complete/{challenge_id}/{submit_token}` | Submit all layer results |
+
+### Purchase & Management (Auth Required)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

@@ -1,4 +1,4 @@
-/** MCP tool definitions for BotGrid */
+/** MCP tool definitions for BotGrid — v2 verification system */
 import { z } from "zod";
 export declare const TOOLS: readonly [{
     readonly name: "botgrid_pricing";
@@ -73,38 +73,89 @@ export declare const TOOLS: readonly [{
     readonly handler: "getRecentEvents";
     readonly auth: false;
 }, {
-    readonly name: "botgrid_register";
-    readonly description: "Start self-service bot registration. Returns an 8-layer SHA-256 verification challenge. Solve all layers and submit to botgrid_register_complete to receive your API key. No pre-existing auth required.";
+    readonly name: "botgrid_verify_challenge";
+    readonly description: "Request a v2 verification challenge. Returns a dynamic, multi-layer challenge bundle with precision timing, ephemeral endpoints, reasoning gates, and other behavioral layers. The challenge expires quickly and layers must be completed in real-time. Requires API key.";
     readonly inputSchema: z.ZodObject<{
-        bot_name: z.ZodString;
+        bot_id: z.ZodString;
+        reservation_id: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
-        bot_name: string;
+        bot_id: string;
+        reservation_id?: string | undefined;
     }, {
-        bot_name: string;
+        bot_id: string;
+        reservation_id?: string | undefined;
     }>;
-    readonly handler: "register";
-    readonly auth: false;
+    readonly handler: "verifyChallenge";
+    readonly auth: true;
 }, {
-    readonly name: "botgrid_register_complete";
-    readonly description: "Complete registration by submitting 8-layer challenge proofs. Returns a new API key (bgk_*). Save it securely — it won't be shown again. Algorithm: for each layer i=1..8, digest_i = sha256(digest_(i-1):bot_id:salt_i:i) starting from base_digest.";
+    readonly name: "botgrid_verify_precision_pulse";
+    readonly description: "Send a precision timing pulse for a v2 challenge. Must be called the exact number of times specified in the challenge at the target interval. Timing accuracy matters — too fast, too slow, or too much jitter will fail. Requires API key.";
     readonly inputSchema: z.ZodObject<{
         challenge_id: z.ZodString;
-        bot_name: z.ZodString;
-        layer_proofs: z.ZodArray<z.ZodString, "many">;
     }, "strip", z.ZodTypeAny, {
-        bot_name: string;
         challenge_id: string;
-        layer_proofs: string[];
     }, {
-        bot_name: string;
         challenge_id: string;
-        layer_proofs: string[];
     }>;
-    readonly handler: "registerComplete";
-    readonly auth: false;
+    readonly handler: "verifyPrecisionPulse";
+    readonly auth: true;
+}, {
+    readonly name: "botgrid_verify_ephemeral";
+    readonly description: "Consume a one-time ephemeral endpoint for a v2 challenge. The endpoint URL and path_token are in the challenge layers. This can only be called once — replays will fail. Requires API key.";
+    readonly inputSchema: z.ZodObject<{
+        challenge_id: z.ZodString;
+        path_token: z.ZodString;
+    }, "strip", z.ZodTypeAny, {
+        challenge_id: string;
+        path_token: string;
+    }, {
+        challenge_id: string;
+        path_token: string;
+    }>;
+    readonly handler: "verifyEphemeralConsume";
+    readonly auth: true;
+}, {
+    readonly name: "botgrid_verify_complete";
+    readonly description: "Complete a v2 verification challenge by submitting all layer results. Use the submit_url from the challenge response. The submit_token is single-use and expires with the challenge. On success, returns a verification_token for use with checkout. Requires API key.";
+    readonly inputSchema: z.ZodObject<{
+        challenge_id: z.ZodString;
+        submit_token: z.ZodString;
+        bot_id: z.ZodString;
+        challenge_signature: z.ZodString;
+        layer_results: z.ZodArray<z.ZodObject<{
+            layer_name: z.ZodString;
+            payload: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+        }, "strip", z.ZodTypeAny, {
+            layer_name: string;
+            payload: Record<string, unknown>;
+        }, {
+            layer_name: string;
+            payload: Record<string, unknown>;
+        }>, "many">;
+    }, "strip", z.ZodTypeAny, {
+        bot_id: string;
+        challenge_id: string;
+        challenge_signature: string;
+        layer_results: {
+            layer_name: string;
+            payload: Record<string, unknown>;
+        }[];
+        submit_token: string;
+    }, {
+        bot_id: string;
+        challenge_id: string;
+        challenge_signature: string;
+        layer_results: {
+            layer_name: string;
+            payload: Record<string, unknown>;
+        }[];
+        submit_token: string;
+    }>;
+    readonly handler: "verifyComplete";
+    readonly auth: true;
 }, {
     readonly name: "botgrid_checkout";
-    readonly description: "Create a Stripe checkout session to purchase tiles. Returns a checkout URL. Requires API key (set BOTGRID_API_KEY).";
+    readonly description: "Create a Stripe checkout session to purchase tiles. Requires a valid verification_token from completing a v2 challenge. Returns a checkout URL. Requires API key.";
     readonly inputSchema: z.ZodObject<{
         bot_name: z.ZodString;
         display_name: z.ZodString;
@@ -122,8 +173,8 @@ export declare const TOOLS: readonly [{
         link: z.ZodOptional<z.ZodString>;
         bot_contact: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
-        bot_name: string;
         display_name: string;
+        bot_name: string;
         tiles: {
             x: number;
             y: number;
@@ -132,8 +183,8 @@ export declare const TOOLS: readonly [{
         link?: string | undefined;
         bot_contact?: string | undefined;
     }, {
-        bot_name: string;
         display_name: string;
+        bot_name: string;
         tiles: {
             x: number;
             y: number;
@@ -162,16 +213,16 @@ export declare const TOOLS: readonly [{
         }>, "many">;
         color: z.ZodString;
     }, "strip", z.ZodTypeAny, {
-        bot_name: string;
         display_name: string;
+        bot_name: string;
         tiles: {
             x: number;
             y: number;
         }[];
         color: string;
     }, {
-        bot_name: string;
         display_name: string;
+        bot_name: string;
         tiles: {
             x: number;
             y: number;

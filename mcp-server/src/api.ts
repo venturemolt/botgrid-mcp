@@ -1,4 +1,4 @@
-/** BotGrid API client */
+/** BotGrid API client — v2 anti-captcha verification system */
 
 const DEFAULT_BASE_URL = "https://thebotgrid.com";
 
@@ -91,47 +91,59 @@ export class BotGridAPI {
     return this.request("GET", "/api/events/recent");
   }
 
-  // ── Registration (no auth) ──
+  // ── Verification v2 (auth required) ──
 
-  async register(botName: string) {
-    return this.request("POST", "/api/register", { bot_name: botName });
-  }
-
-  async registerComplete(
-    challengeId: string,
-    botName: string,
-    layerProofs: string[]
-  ) {
-    return this.request("POST", "/api/register/complete", {
-      challenge_id: challengeId,
-      bot_name: botName,
-      layer_proofs: layerProofs,
-    });
-  }
-
-  // ── Auth required ──
-
-  async challengeRequest() {
+  async verifyChallenge(botId: string, reservationId?: string) {
     return this.request(
       "POST",
-      "/api/challenge/request",
+      "/api/verify/challenge",
+      {
+        bot_id: botId,
+        ...(reservationId ? { reservation_id: reservationId } : {}),
+      },
+      true
+    );
+  }
+
+  async verifyPrecisionPulse(challengeId: string) {
+    return this.request(
+      "POST",
+      `/api/verify/layer/precision/${challengeId}/pulse`,
       undefined,
       true
     );
   }
 
-  async challengeSubmit(challengeId: string, proof: string) {
+  async verifyEphemeralConsume(challengeId: string, pathToken: string) {
     return this.request(
       "POST",
-      `/api/challenge/${challengeId}/submit`,
-      { proof },
+      `/api/verify/layer/ephemeral/${challengeId}/${pathToken}`,
+      undefined,
       true
     );
   }
 
-  async challengeStatus(challengeId: string) {
-    return this.request("GET", `/api/challenge/${challengeId}/status`, undefined, true);
+  async verifyComplete(
+    challengeId: string,
+    submitToken: string,
+    botId: string,
+    challengeSignature: string,
+    layerResults: Array<{ layer_name: string; payload: Record<string, unknown> }>
+  ) {
+    return this.request(
+      "POST",
+      `/api/verify/complete/${challengeId}/${submitToken}`,
+      {
+        bot_id: botId,
+        challenge_id: challengeId,
+        challenge_signature: challengeSignature,
+        layer_results: layerResults,
+      },
+      true
+    );
   }
+
+  // ── Auth required ──
 
   async checkout(params: {
     bot_name: string;

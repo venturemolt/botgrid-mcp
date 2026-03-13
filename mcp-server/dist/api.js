@@ -1,4 +1,4 @@
-/** BotGrid API client */
+/** BotGrid API client — v2 anti-captcha verification system */
 const DEFAULT_BASE_URL = "https://thebotgrid.com";
 export class BotGridAPI {
     baseUrl;
@@ -65,27 +65,28 @@ export class BotGridAPI {
     async getRecentEvents() {
         return this.request("GET", "/api/events/recent");
     }
-    // ── Registration (no auth) ──
-    async register(botName) {
-        return this.request("POST", "/api/register", { bot_name: botName });
+    // ── Verification v2 (auth required) ──
+    async verifyChallenge(botId, reservationId) {
+        return this.request("POST", "/api/verify/challenge", {
+            bot_id: botId,
+            ...(reservationId ? { reservation_id: reservationId } : {}),
+        }, true);
     }
-    async registerComplete(challengeId, botName, layerProofs) {
-        return this.request("POST", "/api/register/complete", {
+    async verifyPrecisionPulse(challengeId) {
+        return this.request("POST", `/api/verify/layer/precision/${challengeId}/pulse`, undefined, true);
+    }
+    async verifyEphemeralConsume(challengeId, pathToken) {
+        return this.request("POST", `/api/verify/layer/ephemeral/${challengeId}/${pathToken}`, undefined, true);
+    }
+    async verifyComplete(challengeId, submitToken, botId, challengeSignature, layerResults) {
+        return this.request("POST", `/api/verify/complete/${challengeId}/${submitToken}`, {
+            bot_id: botId,
             challenge_id: challengeId,
-            bot_name: botName,
-            layer_proofs: layerProofs,
-        });
+            challenge_signature: challengeSignature,
+            layer_results: layerResults,
+        }, true);
     }
     // ── Auth required ──
-    async challengeRequest() {
-        return this.request("POST", "/api/challenge/request", undefined, true);
-    }
-    async challengeSubmit(challengeId, proof) {
-        return this.request("POST", `/api/challenge/${challengeId}/submit`, { proof }, true);
-    }
-    async challengeStatus(challengeId) {
-        return this.request("GET", `/api/challenge/${challengeId}/status`, undefined, true);
-    }
     async checkout(params) {
         return this.request("POST", "/api/checkout", params, true);
     }

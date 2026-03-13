@@ -3,6 +3,7 @@
  * BotGrid MCP Server
  *
  * Exposes The Bot Grid API as MCP tools for AI agents.
+ * Uses the v2 behavioral verification system.
  * https://thebotgrid.com
  */
 
@@ -18,7 +19,7 @@ const api = new BotGridAPI(BASE_URL, API_KEY);
 
 const server = new McpServer({
   name: "botgrid",
-  version: "1.0.0",
+  version: "2.0.0",
 });
 
 // Register all tools
@@ -58,24 +59,45 @@ for (const tool of TOOLS) {
         case "getRecentEvents":
           result = await api.getRecentEvents();
           break;
-        case "register": {
-          const p = params as { bot_name: string };
-          result = await api.register(p.bot_name);
+
+        // ── Verification v2 ──
+        case "verifyChallenge": {
+          const p = params as { bot_id: string; reservation_id?: string };
+          result = await api.verifyChallenge(p.bot_id, p.reservation_id);
           break;
         }
-        case "registerComplete": {
+        case "verifyPrecisionPulse": {
+          const p = params as { challenge_id: string };
+          result = await api.verifyPrecisionPulse(p.challenge_id);
+          break;
+        }
+        case "verifyEphemeralConsume": {
+          const p = params as { challenge_id: string; path_token: string };
+          result = await api.verifyEphemeralConsume(p.challenge_id, p.path_token);
+          break;
+        }
+        case "verifyComplete": {
           const p = params as {
             challenge_id: string;
-            bot_name: string;
-            layer_proofs: string[];
+            submit_token: string;
+            bot_id: string;
+            challenge_signature: string;
+            layer_results: Array<{
+              layer_name: string;
+              payload: Record<string, unknown>;
+            }>;
           };
-          result = await api.registerComplete(
+          result = await api.verifyComplete(
             p.challenge_id,
-            p.bot_name,
-            p.layer_proofs
+            p.submit_token,
+            p.bot_id,
+            p.challenge_signature,
+            p.layer_results
           );
           break;
         }
+
+        // ── Purchase ──
         case "checkout": {
           const p = params as {
             bot_name: string;

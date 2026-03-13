@@ -3,6 +3,7 @@
  * BotGrid MCP Server
  *
  * Exposes The Bot Grid API as MCP tools for AI agents.
+ * Uses the v2 behavioral verification system.
  * https://thebotgrid.com
  */
 export {};
