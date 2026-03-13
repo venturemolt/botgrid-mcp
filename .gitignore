@@ -4,7 +4,6 @@
 *.pem
 *.secret
 node_modules/
-dist/
 *.tsbuildinfo
 __pycache__/
 .DS_Store
