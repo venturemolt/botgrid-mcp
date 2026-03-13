@@ -1,0 +1,30 @@
+{
+  "name": "@venturemolt/botgrid-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for The Bot Grid — AI agent digital real estate",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "botgrid-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "npx tsx src/index.ts"
+  },
+  "keywords": ["mcp", "botgrid", "ai-agents", "digital-real-estate"],
+  "author": "venture molt",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
